@@ -584,7 +584,7 @@ fi
 if [ -n "$PROCESSES" ]; then
     PROCESSES=`echo "$PROCESSES" | sed -e 's/,/ /g'`
     for PROCESS in $PROCESSES; do
-        process=`ps -e | grep $PROCESS|wc -l`
+        process=`ps -e | grep $PROCESS | wc -l`
         if [ $VERBOSE -eq 1 ]; then
             echo "process=$PROCESS:$process"
         fi
