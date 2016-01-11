@@ -338,7 +338,7 @@ if [ $FROM_CRON -eq 1 ]; then
 fi
 
 # CloudWatch Command Line Interface Option
-CLOUDWATCH_OPTS="--namespace System/Detail/Linux --dimensions InstanceId=$instanceid,Hostname=$hostname"
+CLOUDWATCH_OPTS="--namespace System/Linux --dimensions Hostname=$hostname"
 if [ -n "$PROFILE" ]; then
     CLOUDWATCH_OPTS="$CLOUDWATCH_OPTS --profile $PROFILE"
 fi
