@@ -71,6 +71,7 @@ usage()
     printf "    %-28s %s\n" "--disk-space-util" "Reports disk space utilization in percentages."
     printf "    %-28s %s\n" "--disk-space-used" "Reports allocated disk space in gigabytes."
     printf "    %-28s %s\n" "--disk-space-avail" "Reports available disk space in gigabytes."
+    printf "    %-28s %s\n" "--processes PROCESSES" "Reports process counts."
     printf "    %-28s %s\n" "--all-items" "Reports all items."
 }
 
@@ -79,7 +80,7 @@ usage()
 # Options
 ########################################
 SHORT_OPTS="h"
-LONG_OPTS="help,version,verify,verbose,debug,from-cron,profile:,load-ave1,load-ave5,load-ave15,interrupt,context-switch,cpu-us,cpu-sy,cpu-id,cpu-wa,cpu-st,memory-units:,mem-used-incl-cache-buff,mem-util,mem-used,mem-avail,swap-util,swap-used,swap-avail,disk-path:,disk-space-units:,disk-space-util,disk-space-used,disk-space-avail,all-items" 
+LONG_OPTS="help,version,verify,verbose,debug,from-cron,profile:,load-ave1,load-ave5,load-ave15,interrupt,context-switch,cpu-us,cpu-sy,cpu-id,cpu-wa,cpu-st,memory-units:,mem-used-incl-cache-buff,mem-util,mem-used,mem-avail,swap-util,swap-used,swap-avail,disk-path:,disk-space-units:,disk-space-util,disk-space-used,disk-space-avail,processes:,all-items"
 
 ARGS=$(getopt -s bash --options $SHORT_OPTS --longoptions $LONG_OPTS --name $SCRIPT_NAME -- "$@" ) 
 
@@ -113,6 +114,7 @@ DISK_SPACE_UNIT_DIV=1
 DISK_SPACE_UTIL=0
 DISK_SPACE_USED=0
 DISK_SPACE_AVAIL=0
+PROCESSES=""
 
 eval set -- "$ARGS" 
 while true; do 
@@ -217,6 +219,11 @@ while true; do
             ;;
         --disk-space-avail)
             DISK_SPACE_AVAIL=1
+            ;;
+        # Process
+        --processes)
+            shift
+            PROCESSES=$1
             ;;
         --all-items)
             LOAD_AVE1=1
@@ -574,3 +581,15 @@ if [ $DISK_SPACE_AVAIL -eq 1 -a -n "$DISK_PATH" ]; then
     fi
 fi
 
+if [ -n "$PROCESSES" ]; then
+    PROCESSES=`echo "$PROCESSES" | sed -e 's/,/ /g'`
+    for PROCESS in $PROCESSES; do
+        process=`ps -e | grep $PROCESS | wc -l`
+        if [ $VERBOSE -eq 1 ]; then
+            echo "process=$PROCESS:$process"
+        fi
+        if [ $VERIFY -eq 0 ]; then
+            aws cloudwatch put-metric-data --metric-name "Processes=$PROCESS" --value "$process" --unit "Count" $CLOUDWATCH_OPTS
+        fi
+    done
+fi
