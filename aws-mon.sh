@@ -73,6 +73,7 @@ usage()
     printf "    %-28s %s\n" "--disk-space-avail" "Reports available disk space in gigabytes."
     printf "    %-28s %s\n" "--processes PROCESSES" "Reports process counts."
     printf "    %-28s %s\n" "--disk-metric-suffix" "Suffix to add to disk metrics."
+    printf "    %-28s %s\n" "--reboot-required" "Reports if a reboot is required."
     printf "    %-28s %s\n" "--all-items" "Reports all items."
 }
 
@@ -81,7 +82,7 @@ usage()
 # Options
 ########################################
 SHORT_OPTS="h"
-LONG_OPTS="help,version,verify,verbose,debug,from-cron,profile:,load-ave1,load-ave5,load-ave15,interrupt,context-switch,cpu-us,cpu-sy,cpu-id,cpu-wa,cpu-st,memory-units:,mem-used-incl-cache-buff,mem-util,mem-used,mem-avail,swap-util,swap-used,swap-avail,disk-path:,disk-space-units:,disk-space-util,disk-space-used,disk-space-avail,processes:,disk-metric-suffix:,all-items"
+LONG_OPTS="help,version,verify,verbose,debug,from-cron,profile:,load-ave1,load-ave5,load-ave15,interrupt,context-switch,cpu-us,cpu-sy,cpu-id,cpu-wa,cpu-st,memory-units:,mem-used-incl-cache-buff,mem-util,mem-used,mem-avail,swap-util,swap-used,swap-avail,disk-path:,disk-space-units:,disk-space-util,disk-space-used,disk-space-avail,processes:,disk-metric-suffix:,reboot-required,all-items"
 
 ARGS=$(getopt -s bash --options $SHORT_OPTS --longoptions $LONG_OPTS --name $SCRIPT_NAME -- "$@" ) 
 
@@ -117,6 +118,7 @@ DISK_SPACE_USED=0
 DISK_SPACE_AVAIL=0
 PROCESSES=""
 DISK_METRIC_SUFFIX=""
+REBOOT_REQUIRED=0
 
 eval set -- "$ARGS" 
 while true; do 
@@ -231,6 +233,9 @@ while true; do
             shift
             DISK_METRIC_SUFFIX=$1
             ;;
+        --reboot-required)
+            REBOOT_REQUIRED=1
+            ;;
 
         --all-items)
             LOAD_AVE1=1
@@ -252,6 +257,7 @@ while true; do
             DISK_SPACE_UTIL=1
             DISK_SPACE_USED=1
             DISK_SPACE_AVAIL=1
+            REBOOT_REQUIRED=1
             ;;
         --) 
             shift
@@ -599,4 +605,19 @@ if [ -n "$PROCESSES" ]; then
             aws cloudwatch put-metric-data --metric-name "Processes=$PROCESS" --value "$process" --unit "Count" $CLOUDWATCH_OPTS
         fi
     done
+fi
+
+# Reboot
+if [ $REBOOT_REQUIRED -eq 1 ]; then
+    if [ -f /var/run/reboot-required ]; then
+        reboot_required=1
+    else
+        reboot_required=0
+    fi
+    if [ $VERBOSE -eq 1 ]; then
+        echo "reboot_required:$reboot_required"
+    fi
+    if [ $VERIFY -eq 0 ]; then
+        aws cloudwatch put-metric-data --metric-name "RebootRequired" --value "$reboot_required" --unit "None" $CLOUDWATCH_OPTS
+    fi
 fi
