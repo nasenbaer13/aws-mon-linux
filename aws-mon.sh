@@ -75,6 +75,7 @@ usage()
     printf "    %-28s %s\n" "--processes PROCESSES" "Reports process counts."
     printf "    %-28s %s\n" "--disk-metric-suffix" "Suffix to add to disk metrics."
     printf "    %-28s %s\n" "--reboot-required" "Reports if a reboot is required."
+    printf "    %-28s %s\n" "--apt-check" "On Ubuntu, report updates and security updates available to APT."
     printf "    %-28s %s\n" "--all-items" "Reports all items."
 }
 
@@ -83,7 +84,7 @@ usage()
 # Options
 ########################################
 SHORT_OPTS="h"
-LONG_OPTS="help,version,verify,verbose,debug,from-cron,profile:,load-ave1,load-ave5,load-ave15,interrupt,context-switch,cpu-us,cpu-sy,cpu-id,cpu-wa,cpu-st,memory-units:,mem-used-incl-cache-buff,mem-util,mem-used,mem-avail,swap-util,swap-used,swap-avail,disk-path:,disk-space-units:,disk-space-util,disk-space-used,disk-space-avail,processes:,disk-metric-suffix:,reboot-required,all-items"
+LONG_OPTS="help,version,verify,verbose,debug,from-cron,profile:,load-ave1,load-ave5,load-ave15,interrupt,context-switch,cpu-us,cpu-sy,cpu-id,cpu-wa,cpu-st,memory-units:,mem-used-incl-cache-buff,mem-util,mem-used,mem-avail,swap-util,swap-used,swap-avail,disk-path:,disk-space-units:,disk-space-util,disk-space-used,disk-space-avail,processes:,disk-metric-suffix:,reboot-required,apt-check,all-items"
 
 ARGS=$(getopt -s bash --options $SHORT_OPTS --longoptions $LONG_OPTS --name $SCRIPT_NAME -- "$@" ) 
 
@@ -120,6 +121,7 @@ DISK_SPACE_AVAIL=0
 PROCESSES=""
 DISK_METRIC_SUFFIX=""
 REBOOT_REQUIRED=0
+APT_CHECK=0
 
 eval set -- "$ARGS" 
 while true; do 
@@ -236,6 +238,9 @@ while true; do
             ;;
         --reboot-required)
             REBOOT_REQUIRED=1
+            ;;
+        --apt-check)
+            APT_CHECK=1
             ;;
 
         --all-items)
@@ -620,5 +625,27 @@ if [ $REBOOT_REQUIRED -eq 1 ]; then
     fi
     if [ $VERIFY -eq 0 ]; then
         aws cloudwatch put-metric-data --metric-name "RebootRequired" --value "$reboot_required" --unit "None" $CLOUDWATCH_OPTS
+    fi
+fi
+
+if [ $APT_CHECK -eq 1 ]; then
+    # Check if all worked
+    updates=`/usr/lib/update-notifier/apt-check 2>&1`
+    RC="$?"
+    if [ "$RC" -ne 0 ]; then
+        echo "apt-check returned $RC"
+    elif ! echo "$updates" | grep -qE '^[0-9]+;[0-9]+$'; then
+        echo "apt-check returned unexpected output: $updates"
+    else
+		regular_updates="$(echo "$updates"|cut -d ';' -f1)"
+		security_updates="$(echo "$updates"|cut -d ';' -f2)"
+		if [ $VERBOSE -eq 1 ]; then
+			echo "apt_updates:$regular_updates"
+			echo "apt_security_updates:$security_updates"
+		fi
+		if [ $VERIFY -eq 0 ]; then
+			aws cloudwatch put-metric-data --metric-name "AptUpdates" --value "$regular_updates" --unit "Count" $CLOUDWATCH_OPTS
+			aws cloudwatch put-metric-data --metric-name "AptSecurityUpdates" --value "$security_updates" --unit "Count" $CLOUDWATCH_OPTS
+		fi
     fi
 fi
